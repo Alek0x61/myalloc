@@ -34,6 +34,18 @@ void init_arenas() {
         for (int i = 0; i < max_arenas; i++) {
             arenas[i] = NULL;
         }
+
+        main_arena = create_new_arena();
+        if (!main_arena) {
+            fprintf(stderr, "Failed to allocate main_arena\n");
+            exit(EXIT_FAILURE);
+        }
+
+        pthread_mutex_lock(&main_arena->lock);
+        arenas[0] = main_arena;
+        num_arenas = 1;
+
+        pthread_mutex_unlock(&main_arena->lock);
     }
 }
 
