@@ -1,11 +1,15 @@
+#ifndef BLOCK_H
+#define BLOCK_H
+
 #include <stdlib.h>
+#include "arena.h"
 
 typedef struct Block {
-    size_t prev_size;
     size_t size;
     struct Block* fd;
     struct Block* bk;
-    struct Block* fd_nextsize;
-    struct Block* bk_nextsize;
     int free;
+    Arena* arena;
 } Block;
+
+#endif

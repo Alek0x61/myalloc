@@ -1,7 +1,8 @@
-#ifndef ALLOCATOR_H
-#define ALLOCATOR_H
+#ifndef ARENA_ALLOCATOR_H
+#define ARENA_ALLOCATOR_H
 
-#include "types/arena.h"
+#include "block_allocator.h"
+
 #include <unistd.h>
 #include <stdio.h>
 #include <sys/mman.h>
@@ -12,11 +13,12 @@ extern Arena** arenas;
 extern int num_arenas;
 extern int max_arenas;
 
-// #define SBRK_LIMIT  (128 * 1024) //128KB 32bit
-#define LIMIT_32MB  (32 * 1024 * 1024) //32mb 64bit
-#define BLOCK_SIZE  sizeof(Block)
-
+void init_bins(Arena* arena);
+Arena* create_new_arena();
+int get_max_arenas();
 void init_arenas(void);
+Arena* get_arena();
 void* new(size_t size);
+void free(void* ptr);
 
 #endif
