@@ -28,11 +28,12 @@ void init_bins(Arena* arena) {
         arena->bins[i]->size = size;
         size += ALIGNER_BIT; 
     }
+    printf("top_chunk size: %d\n", size);
     arena->top_chunk = chunk; 
 }
 
 Arena* create_new_arena() {
-    Arena* arena = mmap(NULL, sizeof(Arena), 
+    Arena* arena = mmap(NULL, ALIGN_SIZE_64BIT(sizeof(Arena)), 
                 PROT_READ | PROT_WRITE,
                 MAP_PRIVATE | MAP_ANONYMOUS,
                 -1, 0);

@@ -19,8 +19,6 @@ typedef struct Arena {
     struct Block* unsortedbin;
     
     struct Block* top_chunk;
-    
-    char padding[0] __attribute__((aligned(64)));
 } Arena;
 
 #endif

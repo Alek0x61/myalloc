@@ -8,7 +8,6 @@ typedef struct Block {
     size_t size;
     struct Block* fd;
     struct Block* bk;
-    int free;
     Arena* arena;
 } Block;
 

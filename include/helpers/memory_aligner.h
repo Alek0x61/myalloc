@@ -13,6 +13,7 @@
 #define IS_MMAPPED_DECODE_FLAG   0xF
 
 #define ALIGN_SIZE(size) (((size) + ALIGNER_UNIVERSAL) & ~ALIGNER_UNIVERSAL)
+#define ALIGN_SIZE_64BIT(size) (((size) + ALIGNER_64BIT) & ~ALIGNER_64BIT)
 
 #define SMALLBIN_START_SIZE(header_size) ((NUM_FASTBINS * ALIGNER_BIT) + ALIGN_SIZE(header_size))
 

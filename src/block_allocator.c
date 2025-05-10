@@ -65,18 +65,21 @@ Block* find_free_block(Arena* arena, size_t size) {
     // TODO should look at tcache first, but only for exact size match
     // fastbin lookup
     if (index < NUM_FASTBINS && arena->fastbins[index]) {
+        printf("Found fastbin\n");
         block = arena->fastbins[index];
         arena->fastbins[size] = block->fd; 
-        printf("Found fastbin\n");
+        block->arena = arena;
         return block;
     }
-    index = CALCULATE_SMALL_BIN_INDEX(size, BLOCK_SIZE);
 
+    index = CALCULATE_SMALL_BIN_INDEX(size, BLOCK_SIZE);
+    //printf("index: %d\n", index);
     // smallbin lookup if its under the size threshold
     if (index < SMALLBIN_THRESHOLD && arena->bins[index]) {
         printf("Found smallbin\n");
         block = arena->bins[index];
         arena->bins[size] = block->fd;
+        block->arena = arena;
         return block;
     }
 
@@ -126,5 +129,35 @@ void* allocate_block(Arena* arena, size_t size) {
 }
 
 void free_block(void* ptr) {
-    // TODO
+    if (!ptr)
+        return;
+    Block* block = (Block*)ptr - 1; //-1 to get the metadata
+
+    if (block->size == 0) // Sanity check
+        return;
+
+    Arena* arena = block->arena;
+
+    if (IS_MMAPPED(block->size)) {
+        size_t decoded_size = DECODE_MMAPPED_SIZE(block->size);
+        int ret = munmap(block, decoded_size);
+        printf("munmap result: %d\n", ret);
+    }
+
+
+    pthread_mutex_lock(&arena->lock);
+
+    size_t index = CALCULATE_FAST_BIN_INDEX(block->size, BLOCK_SIZE);
+    if (index < NUM_FASTBINS) {
+        block->fd = arena->fastbins[index];
+        arena->fastbins[index] = block;
+        return;
+    }
+    
+
+    index = CALCULATE_SMALL_BIN_INDEX(block->size, BLOCK_SIZE);
+
+    printf("free-block-index: %d\n", index);
+    printf("free-block-size: %d\n", block->size);
+    pthread_mutex_unlock(&arena->lock);
 }
