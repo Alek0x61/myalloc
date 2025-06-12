@@ -6,7 +6,6 @@
 #define NUM_FASTBINS             14
 #define SMALLBIN_THRESHOLD       16
 #define NUM_BINS                 80
-#define TCACHE_MAX_BINS          64
 
 struct Block;
 

@@ -2,7 +2,7 @@
 #define MMMAP_HELPER_H
 
 #include "../types/block.h"
-#include "../../config.h"
+#include "config.h"
 
 #include <stdlib.h>
 #include <sys/mman.h>

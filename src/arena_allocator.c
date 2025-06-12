@@ -3,14 +3,10 @@
 Arena** arenas = NULL;
 static __thread Arena* thread_arena = NULL;
 static Arena* main_arena = NULL;
-static Block* TCache[TCACHE_MAX_BINS];
-static size_t page_size = 4096;
+//static size_t page_size = 4096;
 
 int num_arenas = 0;
 int max_arenas = 0;
-
-pthread_mutex_t arenas_lock = PTHREAD_MUTEX_INITIALIZER;
-static pthread_mutex_t global_arena_lock = PTHREAD_MUTEX_INITIALIZER;
 
 void init_bins(Arena* arena) {
     Block* chunk = request_top_chunk_memory();
@@ -42,12 +38,7 @@ Arena* create_new_arena() {
         perror("mmap failed to allocate new arena");
         return NULL; 
     }
-    pthread_mutex_lock(&arena->lock);
-    init_bins(arena);
-    arenas[num_arenas] = arena;
-    num_arenas++;
-
-    pthread_mutex_unlock(&arena->lock);
+    
     return arena;
 }
 
@@ -86,6 +77,7 @@ void init_arenas() {
 
 __attribute__((constructor))
 static void allocator_constructor() {
+    init_global_lock();
     if (arenas == NULL) {
         init_arenas();
     }
@@ -97,11 +89,11 @@ Arena* get_arena() {
         return thread_arena;
     }
 
-    pthread_mutex_lock(&global_arena_lock);
+    global_lock();
 
     for (int i = 0; arenas[i] != NULL; i++) {
         if (pthread_mutex_trylock(&arenas[i]->lock) == 0) {
-            pthread_mutex_unlock(&global_arena_lock);
+            global_unlock();
             printf("Found previously created Arena\n");
             return arenas[i];
         }
@@ -110,36 +102,98 @@ Arena* get_arena() {
     if (num_arenas < max_arenas) {
         Arena* new_arena = arenas[num_arenas];
         new_arena = create_new_arena();
-        pthread_mutex_unlock(&global_arena_lock);
-        pthread_mutex_lock(&new_arena->lock);
-        thread_arena = new_arena;
+        init_arena_lock(new_arena);
+
+        global_unlock();
+        
+        init_bins(new_arena);
         arenas[num_arenas] = new_arena;
+        thread_arena = new_arena;
 
         num_arenas++;
 
         printf("Created new Arena\n");
         
-        return new_arena;
+        return thread_arena;
     }
 
-    pthread_mutex_lock(&main_arena->lock);
-    pthread_mutex_unlock(&global_arena_lock);
+    global_unlock();
     printf("Returning Main Arena\n");
     return main_arena;
 }
+
+void* allocate_block(Arena* arena, size_t size) {
+    size += BLOCK_SIZE;
+    size = ALIGN_SIZE(size);
+
+    printf("Trying to allocate size: %d\n", size);
+
+    int index = tcache_find_index(size);
+    if (index > -1) {
+        return tcache_alloc(index);
+    }
+
+    if (size >= M_MMAP_THRESHOLD) {
+        size_t metadata_size = ENCODE_AS_MMAPPED(size);
+        Block* block = request_block_memory(metadata_size, size);
+        return block;
+    }
+
+    lock_arena(arena);
+
+    index = fastbin_find_index(arena, size);
+    if (index > -1) {
+        Block* block = fastbin_alloc(arena, index);
+        unlock_arena(arena);
+        return block;
+    }
+
+    index = smallbin_find_index(arena, size);
+    if (index > -1) {
+        Block* block = smallbin_alloc(arena, index);
+        unlock_arena(arena);
+        return block;
+    }
+
+    Block* unsortedbin_block = unsortedbin_try_alloc(arena, size);
+    if (unsortedbin_block != NULL) {
+        unlock_arena(arena);
+        return unsortedbin_block;
+    }
+
+    index = largebin_find_index(arena, size);
+    if (index > -1) {
+        Block* block = largebin_alloc(arena, index, size);
+        unlock_arena(arena);
+        return block;
+    }
+
+    //TODO sort unsorted blocks into small and large bins
+    if (arena->top_chunk->size < size) {
+        Block* top_chunk_prev = arena->top_chunk;
+        arena->top_chunk = request_top_chunk_memory();
+        arena->top_chunk = combine_two_chunks(top_chunk_prev, arena->top_chunk);
+    }
+    printf("Splitting from top chunk\n");
+    Block* block = split_chunk(&arena->top_chunk, size);
+
+    unlock_arena(arena);
+
+    return block;
+}
+
 
 void* new(size_t size) {
     pthread_t thread_id = pthread_self();
 
     Arena* arena = get_arena();
     printf("Arena pointer: %p\n", arena);
-    void* ptr = allocate_block(arena, size);
+    void* block_header = allocate_block(arena, size);
+    void* usable_memory = (void*)(block_header + 1);
 
-    pthread_mutex_unlock(&arena->lock);
-
-    return ptr;
+    return usable_memory;
 }
 
 void free(void* ptr) {
-    free_block(ptr);
+    // free_block(ptr);
 }
